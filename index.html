@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Anatomie">
+<meta name="theme-color" content="#FFF8DC">
+<title>Anatomie-Tracker</title>
+<style>
+/* Grundlage, die beim Claude-Artifact der Rahmen liefert */
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<style>
+/* Layout: eine schmale Spalte (max. 64rem), Kopf mit Countdown, darunter Tabs und ein Kachelraster. Strichstärke 1.5px durchgehend (Line-Art). Palette: cornsilk. */
+:root{
+  --bg:#FFF8DC;--surface:#FFFDF1;--ink:#33290f;--muted:#6d5f35;--line:#e6d9a6;--anki:#b5861c;--anki-ink:#7a5200;--anki-soft:#f7ebbd;--amb:#7d9a63;--amb-ink:#3f5e2c;--amb-soft:#e6eed6;--warn:#a8321f;--warn-soft:#fbdcc9;--on-accent:#2b2006;
+  --font:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#1c190e;--surface:#26220f;--ink:#f6efd0;--muted:#b8ad7f;--line:#4a4326;--anki:#d1a43a;--anki-ink:#e8c570;--anki-soft:#3a3115;--amb:#8fae7e;--amb-ink:#b8d2a8;--amb-soft:#252f1f;--warn:#ff8a78;--warn-soft:#3b1f1b;--on-accent:#1c190e;color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1c190e;--surface:#26220f;--ink:#f6efd0;--muted:#b8ad7f;--line:#4a4326;--anki:#d1a43a;--anki-ink:#e8c570;--anki-soft:#3a3115;--amb:#8fae7e;--amb-ink:#b8d2a8;--amb-soft:#252f1f;--warn:#ff8a78;--warn-soft:#3b1f1b;--on-accent:#1c190e;color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45;
+  padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:64rem;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--anki);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;gap:18px 32px;align-items:flex-end;justify-content:space-between}
+.count{display:flex;align-items:baseline;gap:10px;min-width:0}
+.count .n{font-size:3.6rem;line-height:1;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--anki-ink)}
+.count .l{display:flex;flex-direction:column;color:var(--muted);font-size:.95rem}
+.count .l b{color:var(--ink);font-weight:600}
+.bars{display:flex;flex-direction:column;gap:10px;flex:1 1 15rem;max-width:26rem;min-width:0}
+.bar .row{display:flex;justify-content:space-between;gap:8px;font-size:.82rem;color:var(--muted);margin-bottom:4px}
+.bar .row b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.track{height:6px;border-radius:3px;background:var(--line);overflow:hidden;width:100%}
+.fill{height:100%;border-radius:3px;width:0;transition:width .3s}
+.bar.anki .fill{background:var(--anki)}
+.bar.amboss .fill{background:var(--amb)}
+
+nav{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+.tabs,.chips{display:flex;gap:6px;flex-wrap:wrap}
+.tab,.chip{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:8px 16px;min-height:40px;color:var(--muted)}
+.tab[aria-selected="true"]{border-color:var(--ink);color:var(--ink);font-weight:600}
+.chip{padding:6px 12px;min-height:36px;font-size:.88rem}
+.chip[aria-pressed="true"]{border-color:var(--anki);color:var(--anki-ink);font-weight:600}
+
+h2{font-size:1.05rem;font-weight:600;margin:0}
+.sec{display:flex;flex-direction:column;gap:10px}
+.sec-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.sec-h .sub{color:var(--muted);font-size:.88rem}
+.load{font-size:.82rem;font-variant-numeric:tabular-nums;border:1.5px solid var(--line);border-radius:999px;padding:2px 10px;color:var(--muted)}
+.load.over{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,10.5rem),1fr));gap:10px}
+.tile{
+  display:flex;flex-direction:column;align-items:flex-start;gap:10px;text-align:left;
+  min-height:92px;min-width:0;padding:12px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface);
+}
+.tile .box{width:24px;height:24px;border:1.5px solid var(--c);border-radius:50%;display:grid;place-items:center;flex:none}
+.tile .box svg{width:14px;height:14px;fill:none;stroke:transparent;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tile.anki{--c:var(--anki);--ci:var(--anki-ink);--soft:var(--anki-soft)}
+.tile.amboss{--c:var(--amb);--ci:var(--amb-ink);--soft:var(--amb-soft)}
+.tile .ttl{font-weight:600;overflow-wrap:anywhere;min-width:0}
+.tile .meta{display:flex;flex-wrap:wrap;gap:2px 8px;font-size:.78rem;color:var(--muted);margin-top:auto}
+.tile .tag{color:var(--ci);font-weight:600}
+.tile .mv{color:var(--warn);font-weight:600}
+.tile.done{background:var(--soft)}
+.tile.done .box{background:var(--c)}
+.tile.done .box svg{stroke:var(--surface)}
+button.tile.done .ttl{color:var(--muted);text-decoration:line-through;text-decoration-thickness:1.5px}
+.tile .big{font-size:1.5rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile.wide{grid-column:1/-1;gap:12px}
+.tile .arow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%}
+.tile .arow .big{margin-left:auto}
+.tile .fill{background:var(--c)}
+.tile .ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn.s{padding:6px 14px;min-height:42px;border-color:var(--c);color:var(--ci)}
+.num{display:flex;align-items:center;gap:6px;font-size:.88rem;color:var(--muted)}
+.num input[type=number]{width:6.5rem;padding:8px 10px}
+
+.note{border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;font-size:.92rem;background:var(--surface)}
+.note.warn{border-color:var(--warn);background:var(--warn-soft)}
+.note b{font-weight:600}
+.empty{color:var(--muted);padding:18px 4px}
+
+form{display:flex;flex-direction:column;gap:16px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.field .lab{font-weight:600;font-size:.92rem}
+.hint{color:var(--muted);font-size:.82rem}
+input[type=date],input[type=number],textarea{
+  border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;width:100%;max-width:100%;
+}
+input[type=date],input[type=number]{max-width:14rem}
+textarea{min-height:12rem;font-family:var(--mono);font-size:.82rem;line-height:1.5;resize:vertical}
+.rest{display:flex;flex-wrap:wrap;gap:6px}
+.rest label{display:flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:6px 12px;min-height:38px;font-weight:400}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1.5px solid var(--ink);background:transparent;border-radius:10px;padding:10px 16px;min-height:44px;font-weight:600}
+.btn.primary{background:var(--anki);border-color:var(--anki);color:var(--on-accent)}
+.btn.danger{border-color:var(--warn);color:var(--warn)}
+.panel{border:1.5px solid var(--line);border-radius:14px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:16px}
+#msg{min-height:1.4em;font-size:.9rem}
+#msg.err{color:var(--warn)}
+.sync{margin:0;font-size:.82rem;color:var(--muted);display:flex;align-items:center;gap:8px;min-height:1.4em}
+.sync::before{content:"";width:8px;height:8px;border-radius:50%;border:1.5px solid currentColor;flex:none}
+.sync.ok::before{background:currentColor}
+.sync.err{color:var(--warn)}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="count"><span class="n" id="days">–</span><span class="l" id="daysL"></span></div>
+    <div class="bars" id="bars"></div>
+  </header>
+  <nav>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="chips" id="chips"></div>
+  </nav>
+  <main id="view"></main>
+  <p id="sync" class="sync" role="status"></p>
+</div>
+
+<script>
+(function(){
+var KEY='anatomie-tracker-v2';
+var AREA={anki:{name:'Anki',short:'Anki'},amboss:{name:'viaMedici & Amboss',short:'viaMedici/Amboss'}};
+var TABS=[['heute','Heute'],['plan','Plan'],['themen','Themen'],['daten','Einstellungen']];
+var WD=[['1','Mo'],['2','Di'],['3','Mi'],['4','Do'],['5','Fr'],['6','Sa'],['0','So']];
+var CHECK='<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+
+function pad(n){return String(n).padStart(2,'0');}
+function ymd(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function parse(s){var p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);}
+function addDays(s,n){var d=parse(s);d.setDate(d.getDate()+n);return ymd(d);}
+function diffDays(a,b){return Math.round((parse(b)-parse(a))/864e5);}
+function fmtDate(s){return parse(s).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});}
+function fmt(n){return String(Math.round(n*10)/10).replace('.',',');}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function idOf(area,title){return area+'|'+title.trim().toLowerCase();}
+
+/* Themenliste viaMedici & Amboss: [Gruppe, Titel, Lesezeit in Minuten], Reihenfolge wie vom Nutzer geliefert. w wird intern in Stunden gehalten. */
+var RAW=[
+  ['Allgemeine Anatomie','Anatomie für Einsteiger',5],['Allgemeine Anatomie','Oberflächenanatomie',1],['Allgemeine Anatomie','Körperachsen und -ebenen',6],
+  ['Allgemeine Anatomie','Grundlagen bildgebender Verfahren',7],['Allgemeine Anatomie','Cinematic Anatomy',27],['Allgemeine Anatomie','3D-Anatomie im Überblick',6],
+  ['Allgemeine Anatomie','Bewegungsapparat im Überblick',14],
+  ['Rumpf, dorsale Wand','Wirbel',13],['Rumpf, dorsale Wand','Wirbelsäule 1',8],['Rumpf, dorsale Wand','Wirbelsäule 2',6],['Rumpf, dorsale Wand','Wirbelsäule 3',4],
+  ['Rumpf, dorsale Wand','Rückenmuskulatur',12],['Rumpf, dorsale Wand','Muskeltrainer Rückenmuskulatur',5],['Rumpf, dorsale Wand','Rumpfwand Gefäßversorgung',4],
+  ['Rumpf, ventrale Wand','Brustwand: Knochen und Gelenke',7],['Rumpf, ventrale Wand','Brustwand: Muskulatur',5],['Rumpf, ventrale Wand','Mamma',9],
+  ['Rumpf, ventrale Wand','Zwerchfell',7],['Rumpf, ventrale Wand','Muskeltrainer Brustwand/Zwerchfell',2],['Rumpf, ventrale Wand','Bauchwand',19],
+  ['Rumpf, ventrale Wand','Muskeltrainer Bauchwand',2],['Rumpf, ventrale Wand','Leistenkanal',9],['Rumpf, ventrale Wand','Leistenregion',3],
+  ['Obere Extremität','Überblick',2],['Obere Extremität','Oberflächenanatomie',4],['Obere Extremität','Gefäß-/Nervenstraßen am Arm',4],['Obere Extremität','Nerven der oberen Extremität',28],
+  ['Schultergürtel','Clavicula',1],['Schultergürtel','Scapula',3],['Schultergürtel','Sternoklavikulargelenk',2],['Schultergürtel','Acromioclaviculargelenk',3],
+  ['Schultergürtel','Schultergelenk',5],['Schultergürtel','Schultergürtelmuskulatur',6],['Schultergürtel','Schultergelenkmuskulatur',11],['Schultergürtel','Arterien',12],['Schultergürtel','Achselhöhle',6],
+  ['Oberarm','Oberarmknochen',4],['Oberarm','Ellenbogengelenk',8],['Oberarm','Oberarmmuskulatur',9],['Oberarm','Gefäß-/Nervenstraße am Arm',4],['Oberarm','Ellenbeuge',2],
+  ['Unterarm und Hand','Elle und Speiche',5],['Unterarm und Hand','Distales Radioulnargelenk',2],['Unterarm und Hand','Handknochen',6],['Unterarm und Hand','Handgelenke',8],
+  ['Unterarm und Hand','Fingergelenke',4],['Unterarm und Hand','Unterarmmuskulatur',19],['Unterarm und Hand','Kurze Handmuskeln',9],['Unterarm und Hand','Karpaltunnel',5],
+  ['Unterarm und Hand','Hohlhand',3],['Unterarm und Hand','Handrücken',2],
+  ['Obere Extremität','Muskeltrainer Obere Extremität',12],['Obere Extremität','Venen',4],['Obere Extremität','Lymphknoten',2],
+  ['Untere Extremität','Überblick',3],['Untere Extremität','Oberflächenanatomie',4],['Untere Extremität','Nerven der unteren Extremität',30],
+  ['Hüfte und Oberschenkel','Hüftbein',4],['Hüfte und Oberschenkel','Knöchernes Becken',4],['Hüfte und Oberschenkel','Femur',4],['Hüfte und Oberschenkel','Gelenke und Bänder',4],
+  ['Hüfte und Oberschenkel','Hüftgelenk',5],['Hüfte und Oberschenkel','Hüftmuskulatur',12],['Hüfte und Oberschenkel','Oberschenkelmuskulatur',14],
+  ['Hüfte und Oberschenkel','Oberschenkelvorderseite',5],['Hüfte und Oberschenkel','Gesäßregion',4],
+  ['Knie und Unterschenkel','Patella',2],['Knie und Unterschenkel','Tibia',4],['Knie und Unterschenkel','Kniegelenk',14],['Knie und Unterschenkel','Verbindung zwischen Tibia und Fibula',2],
+  ['Knie und Unterschenkel','Unterschenkelmuskulatur',15],['Knie und Unterschenkel','Hintere Knieregion',3],
+  ['Fuß','Fußknochen',10],['Fuß','Weitere Gelenke',4],['Fuß','Sprunggelenke',8],['Fuß','Kurze Fußmuskeln',7],['Fuß','Knöchelregion',4],
+  ['Untere Extremität','Muskeltrainer Untere Extremität',11],['Untere Extremität','Arterien',12],['Untere Extremität','Venen',6],['Untere Extremität','Lymphknoten',3]
+];
+function realTopics(){
+  return RAW.map(function(r){var title=r[0]+': '+r[1];return {id:idOf('amboss',title),area:'amboss',title:title,w:r[2]/60};});
+}
+function defaults(){
+  return {sample:false,ver:4,
+    settings:{exam:'2026-11-20',start:'2026-11-01',limit:6,rest:['6'],pace:100,rf:1.5,ankiHi:400,ankiLo:200},
+    anki:{total:4808,log:{}},
+    topics:realTopics(),done:{},base:{}};
+}
+
+/* Ältere Stände (unveränderte Beispielliste) bekommen die echte Themenliste. Anki-Fortschritt und Einstellungen bleiben erhalten. */
+function migrate(s){
+  if(!s.settings.start)s.settings.start='2026-11-01';
+  if(!(s.settings.ankiHi>0))s.settings.ankiHi=400;
+  if(!(s.settings.ankiLo>0))s.settings.ankiLo=200;
+  if(s.ver===4)return s;
+  if(s.ver===3){s.base={};s.ver=4;return s;}
+  if(s.sample){
+    var nt=realTopics(),keep={},nd={};
+    nt.forEach(function(t){keep[t.id]=1;});
+    Object.keys(s.done||{}).forEach(function(k){if(keep[k])nd[k]=s.done[k];});
+    s.topics=nt;s.done=nd;s.base={};s.sample=false;
+  }
+  if(!(s.settings.rf>0))s.settings.rf=1.5;
+  s.ver=4;s.base={};
+  return s;
+}
+var memOnly=false;
+function load(){
+  try{
+    var raw=localStorage.getItem(KEY);
+    if(raw){var s=JSON.parse(raw);if(s&&s.topics&&s.settings){s.anki=s.anki||{total:0,log:{}};return migrate(s);}}
+  }catch(e){memOnly=true;}
+  return defaults();
+}
+var S=load();
+
+/* Speicher in zwei Schichten: localStorage als schneller Zwischenspeicher, dazu ein privates Dokument im Konto (db unter data/users/<id>/tracker), das ein Schließen oder Leeren des Browsers übersteht. Beim Laden gewinnt der Stand mit dem neueren Zeitstempel (savedAt). Ohne Konto-Speicher läuft die Seite weiter rein lokal. */
+var remote={ref:null,state:window.claude&&window.claude.use?'connecting':'local',busy:false,dirty:false,timer:null,err:''};
+/* persistLocal schreibt nur den Zwischenspeicher und setzt keinen Zeitstempel (für abgeleitete Daten wie base). save() ist für echte Änderungen des Nutzers: es stempelt, schreibt lokal und stößt das Speichern im Konto an. */
+function persistLocal(){
+  try{localStorage.setItem(KEY,JSON.stringify(S));memOnly=false;}catch(e){memOnly=true;}
+}
+function save(){
+  S.savedAt=Date.now();
+  persistLocal();
+  if(remote.ref){remote.dirty=true;clearTimeout(remote.timer);remote.timer=setTimeout(flushRemote,800);}
+}
+function flushRemote(){
+  if(!remote.ref||remote.busy||!remote.dirty)return;
+  remote.busy=true;remote.dirty=false;remote.state='saving';paintSync();
+  remote.ref.set({json:JSON.stringify(S),updated:S.savedAt||0}).then(function(){
+    remote.busy=false;remote.state='ok';remote.err='';paintSync();
+    if(remote.dirty)flushRemote();
+  },function(e){
+    remote.busy=false;remote.dirty=true;remote.state='error';remote.err=(e&&e.code)||'unbekannt';paintSync();
+  });
+}
+/* STANDALONE wird beim Bau der eigenständigen Datei (ohne Claude) auf true gesetzt. Dort gibt es keinen Konto-Speicher, die Statuszeile zeigt stattdessen das Alter der letzten Sicherung. */
+var STANDALONE=true;
+function backupLine(){
+  var lb=S.lastBackup,days=lb?Math.floor((Date.now()-lb)/864e5):-1;
+  var t='Nur in diesem Browser gespeichert. '+(lb?'Letzte Sicherung: '+(days<=0?'heute':'vor '+days+(days===1?' Tag':' Tagen'))+'.':'Noch keine Sicherung erstellt (Einstellungen).');
+  return [(!lb||days>=3)?'err':'',t];
+}
+function paintSync(){
+  var el=document.getElementById('sync');
+  if(!el)return;
+  var m={connecting:['','Verbinde mit dem Speicher …'],local:['','Nur in diesem Browser gespeichert. Der Konto-Speicher ist nicht verfügbar.'],
+    saving:['','Speichere …'],ok:['ok','Im Konto gesichert.'],
+    error:['err','Speichern im Konto fehlgeschlagen ('+remote.err+'). Der Stand liegt nur in diesem Browser. Die nächste Änderung versucht es erneut.']}[remote.state];
+  if(STANDALONE)m=backupLine();
+  el.className='sync '+m[0];el.textContent=m[1];
+}
+function adopt(snap){
+  var d=snap.exists?snap.data():null,srv=null;
+  if(d&&typeof d.json==='string'){try{srv=JSON.parse(d.json);}catch(e){srv=null;}}
+  if(srv&&srv.topics&&srv.settings){
+    srv.anki=srv.anki||{total:0,log:{}};
+    var a=srv.savedAt||0,b=S.savedAt||0;
+    if(a>b){
+      S=migrate(srv);
+      try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+      remote.state='ok';render();
+    }else if(a<b){remote.dirty=true;flushRemote();}
+    else{remote.state='ok';paintSync();}
+    return;
+  }
+  if(!snap.exists&&snap.metadata&&snap.metadata.fromCache){remote.state='error';remote.err='nicht erreichbar';paintSync();return;}
+  remote.dirty=true;flushRemote();
+}
+function pullRemote(){
+  if(!remote.ref||remote.busy||remote.dirty)return;
+  remote.ref.get().then(adopt,function(e){remote.state='error';remote.err=(e&&e.code)||'unbekannt';paintSync();});
+}
+function initRemote(){
+  if(!(window.claude&&window.claude.use)){remote.state='local';paintSync();return;}
+  var t=setTimeout(function(){if(remote.state==='connecting'){remote.state='local';paintSync();}},10000);
+  Promise.all([window.claude.use('db'),window.claude.use('user')]).then(function(r){
+    if(!r[0]||!r[1])return null;
+    return r[1].id().then(function(id){
+      if(!id)return null;
+      remote.ref=r[0].doc('data/users/'+id+'/tracker');
+      return remote.ref.get();
+    });
+  }).then(function(snap){
+    clearTimeout(t);
+    if(!snap){remote.state='local';paintSync();return;}
+    adopt(snap);
+  },function(e){
+    clearTimeout(t);remote.state='error';remote.err=(e&&e.code)||'unbekannt';paintSync();
+  });
+}
+var view='heute',filter='alle',resetArm=false,msg={t:'',err:false};
+var ui={pastOpen:true,nach:{}};
+
+function sumLog(before){
+  var s=0,k;
+  for(k in S.anki.log){if(!before||k<before)s+=S.anki.log[k];}
+  return s;
+}
+
+/* Planlogik: offene Themen und offene Anki-Karten werden bei jedem Aufruf neu gleichmäßig auf die verbleibenden Lerntage verteilt (heute bis Tag vor der Prüfung, ohne Ruhetage). Last in Stunden: Amboss-Kacheln nach Std., Anki nach Karten geteilt durch Tempo. */
+function computePlan(){
+  var today=ymd(new Date());
+  var last=addDays(S.settings.exam,-1);
+  var days=[];
+  for(var d=today;d<=last;d=addDays(d,1)){
+    if(S.settings.rest.indexOf(String(parse(d).getDay()))<0)days.push(d);
+  }
+  var pend=S.topics.filter(function(t){return !S.done[t.id];});
+  var rf=S.settings.rf>0?S.settings.rf:1;
+  var topicH=pend.reduce(function(a,t){return a+t.w;},0)*rf;
+  var pace=S.settings.pace>0?S.settings.pace:100;
+  var aOn=S.anki.total>0;
+  var todayDone=aOn?(S.anki.log[today]||0):0;
+  var rem0=aOn?Math.max(0,S.anki.total-sumLog(today)):0;
+  var map={},load={},assigned={},ap={};
+
+  if(!days.length){
+    if(pend.length){map[today]=pend.slice();pend.forEach(function(t){assigned[t.id]=today;});}
+    if(rem0>0)ap[today]=rem0;
+    load[today]=topicH+rem0/pace;
+    return {today:today,days:days,map:map,load:load,assigned:assigned,perDay:topicH+rem0/pace,pend:pend,
+      anki:{on:aOn,plan:ap,target:ap[today]||0,done:todayDone,rem:rem0,pace:pace}};
+  }
+  if(aOn&&rem0>0){
+    var R=rem0,list2=days.slice(),hi=S.settings.ankiHi>0?S.settings.ankiHi:400,lo=S.settings.ankiLo>0?S.settings.ankiLo:200;
+    if(days[0]===today){
+      var tt=distAnki(R,list2.length,hi,lo)[0];
+      ap[today]=tt;
+      R=Math.max(0,R-Math.max(tt,todayDone));
+      list2=list2.slice(1);
+    }else if(todayDone>0){R=Math.max(0,R-todayDone);}
+    if(list2.length){
+      var arr=distAnki(R,list2.length,hi,lo);
+      list2.forEach(function(dd,i){ap[dd]=arr[i];});
+    }
+    Object.keys(ap).forEach(function(k){load[k]=(load[k]||0)+ap[k]/pace;});
+  }
+  /* Lesestoff: Jeder Tag bekommt Lesestoff im Verhältnis zu seiner freien Zeit (Limit minus Anki-Stunden). Wegen der vielen Anki-Karten am Anfang landet der Hauptteil in der zweiten Hälfte. Die Reihenfolge der Kacheln bleibt erhalten. */
+  var cap=days.map(function(d){return Math.max(0,S.settings.limit-(ap[d]||0)/pace);});
+  if(!(cap.reduce(function(x,y){return x+y;},0)>0))cap=days.map(function(){return 1;});
+  var capSum=cap.reduce(function(x,y){return x+y;},0);
+  ['anki','amboss'].forEach(function(a){
+    var list=pend.filter(function(t){return t.area===a;});
+    var at=list.reduce(function(x,t){return x+t.w;},0);
+    if(!list.length)return;
+    var acc=0,bound=[],cum=0;
+    cap.forEach(function(c){acc+=c/capSum*at;bound.push(acc);});
+    list.forEach(function(t){
+      var mid=cum+t.w/2,i=0;
+      while(i<days.length-1&&mid>bound[i]+1e-9)i++;
+      var dt=days[i];
+      (map[dt]=map[dt]||[]).push(t);
+      load[dt]=(load[dt]||0)+t.w*rf;
+      assigned[t.id]=dt;
+      cum+=t.w;
+    });
+  });
+  return {today:today,days:days,map:map,load:load,assigned:assigned,perDay:(topicH+rem0/pace)/days.length,pend:pend,
+    anki:{on:aOn,plan:ap,target:ap[today]||0,done:todayDone,rem:rem0,pace:pace}};
+}
+/* Verteilt R Karten auf n Tage: erst Tage mit hi Karten, ein Übergangstag, dann Tage mit lo Karten, sodass die Summe genau R ergibt. Liegt der Durchschnitt außerhalb von lo..hi, wird gleichmäßig verteilt. */
+function distAnki(R,n,hi,lo){
+  var a=[],i;
+  if(n<=0)return a;
+  if(R<=0){for(i=0;i<n;i++)a.push(0);return a;}
+  var base=R/n;
+  if(base<=lo||base>=hi||hi<=lo){
+    var b=Math.floor(R/n),x=R%n;
+    for(i=0;i<n;i++)a.push(b+(i<x?1:0));
+    return a;
+  }
+  var k=Math.floor((R-lo*n)/(hi-lo));
+  var mid=R-hi*k-lo*(n-k-1);
+  for(i=0;i<n;i++)a.push(i<k?hi:(i===k?mid:lo));
+  return a;
+}
+function daySub(d,P){
+  var l=P.map[d]||[],rf=S.settings.rf>0?S.settings.rf:1,p=[];
+  var m=l.reduce(function(a,t){return a+t.w*60;},0);
+  if(l.length)p.push('Lesen '+Math.round(m)+' Min. Lesezeit, eingeplant '+Math.round(m*rf)+' Min.');
+  if(P.anki.on&&P.anki.plan[d])p.push('Anki '+fmt(P.anki.plan[d]/P.anki.pace)+' Std.');
+  return p.length?'<span class="sub">'+p.join(' · ')+'</span>':'';
+}
+function dayKeys(P){
+  var o={};
+  Object.keys(P.map).forEach(function(k){o[k]=1;});
+  Object.keys(P.anki.plan).forEach(function(k){if(P.anki.plan[k]>0)o[k]=1;});
+  return Object.keys(o).sort();
+}
+
+function tile(t,P,day){
+  var done=S.done[t.id],a=P.assigned[t.id],b=S.base[t.id];
+  var moved=!done&&b&&a&&a>b;
+  var m='<span class="tag">'+AREA[t.area].short+'</span><span>'+Math.round(t.w*60)+' Min. Lesezeit</span>';
+  if(moved)m+='<span class="mv">verschoben, urspr. '+fmtDate(b)+'</span>';
+  if(done)m+='<span>erledigt '+fmtDate(done)+'</span>';
+  return '<button type="button" class="tile '+t.area+(done?' done':'')+'" data-id="'+esc(t.id)+'"'+(day?' data-day="'+day+'"':'')+' aria-pressed="'+(done?'true':'false')+'">'+
+    '<span class="box" aria-hidden="true">'+CHECK+'</span>'+
+    '<span class="ttl">'+esc(t.title)+'</span><span class="meta">'+m+'</span></button>';
+}
+function ankiTile(d,P){
+  if(filter==='amboss'||!P.anki.on)return '';
+  var n=P.anki.plan[d]||0;
+  if(d===P.today){
+    var D=P.anki.done,T=n;
+    if(!T&&!D)return '';
+    var done=T>0?D>=T:D>0;
+    var pct=T?Math.min(100,Math.round(D/T*100)):100;
+    return '<div class="tile anki wide'+(done?' done':'')+'">'+
+      '<div class="arow"><span class="box" aria-hidden="true">'+CHECK+'</span><span class="ttl">Anki heute</span><span class="big">'+D+' / '+T+' Karten</span></div>'+
+      '<div class="track"><div class="fill" style="width:'+pct+'%"></div></div>'+
+      '<div class="ctl"><button type="button" class="btn s" data-act="anki" data-n="-50">−50</button>'+
+      '<button type="button" class="btn s" data-act="anki" data-n="50">+50</button>'+
+      '<button type="button" class="btn s" data-act="anki" data-n="100">+100</button>'+
+      '<button type="button" class="btn s" data-act="anki" data-n="all">Tagesziel erreicht</button>'+
+      '<label class="num">Genau<input type="number" id="ankiToday" min="0" inputmode="numeric" value="'+D+'"></label></div>'+
+      '<span class="meta"><span class="tag">Anki</span><span>'+fmt(T/P.anki.pace)+' Std. geplant</span><span>offen insgesamt: '+P.anki.rem+' Karten</span></span></div>';
+  }
+  if(!n)return '';
+  return '<div class="tile anki"><span class="ttl">Anki</span><span class="big">'+n+'</span><span class="meta"><span class="tag">Karten</span><span>'+fmt(n/P.anki.pace)+' Std.</span></span></div>';
+}
+function vis(list){return list.filter(function(t){return filter==='alle'||t.area===filter;});}
+function grid(inner){return '<div class="grid">'+inner+'</div>';}
+function tiles(list,P,day){return list.map(function(t){return tile(t,P,day);}).join('');}
+function loadPill(dt,P){
+  var l=P.load[dt]||0,over=l>S.settings.limit+1e-9;
+  return '<span class="load'+(over?' over':'')+'">'+fmt(l)+' von '+fmt(S.settings.limit)+' Std.</span>';
+}
+
+function ensureBase(P){
+  var ch=false;
+  P.pend.forEach(function(t){if(!S.base[t.id]&&P.assigned[t.id]){S.base[t.id]=P.assigned[t.id];ch=true;}});
+  if(ch)persistLocal();
+}
+
+function renderHead(P){
+  var left=diffDays(P.today,S.settings.exam);
+  document.getElementById('days').textContent=left>0?left:'0';
+  document.getElementById('daysL').innerHTML=left>0?'<b>Tage bis zur Prüfung</b><span>'+fmtDate(S.settings.exam)+'</span>':'<b>Prüfungsdatum erreicht</b><span>'+fmtDate(S.settings.exam)+'</span>';
+  var h='';
+  ['anki','amboss'].forEach(function(a){
+    var tt=S.topics.filter(function(t){return t.area===a;});
+    var tw=tt.reduce(function(x,t){return x+t.w;},0);
+    var dw=tt.filter(function(t){return S.done[t.id];}).reduce(function(x,t){return x+t.w;},0);
+    var dn=tt.filter(function(t){return S.done[t.id];}).length;
+    var pct=tw?Math.round(dw/tw*100):0,lab='<b>'+dn+'</b> von '+tt.length+' Kacheln';
+    if(a==='anki'&&S.anki.total>0){
+      var ds=Math.min(S.anki.total,sumLog());
+      pct=Math.round(ds/S.anki.total*100);
+      lab='<b>'+ds+'</b> von '+S.anki.total+' Karten';
+    }else if(a==='anki'&&!tt.length)return;
+    h+='<div class="bar '+a+'"><div class="row"><span>'+AREA[a].name+'</span><span>'+lab+'</span></div><div class="track"><div class="fill" style="width:'+pct+'%"></div></div></div>';
+  });
+  document.getElementById('bars').innerHTML=h;
+}
+function renderNav(){
+  document.getElementById('tabs').innerHTML=TABS.map(function(t){
+    return '<button type="button" class="tab" role="tab" data-tab="'+t[0]+'" aria-selected="'+(view===t[0])+'">'+t[1]+'</button>';
+  }).join('');
+  var c=document.getElementById('chips');
+  if(view==='daten'){c.innerHTML='';return;}
+  c.innerHTML=[['alle','Alle'],['anki','Anki'],['amboss','viaMedici & Amboss']].map(function(x){
+    return '<button type="button" class="chip" data-filter="'+x[0]+'" aria-pressed="'+(filter===x[0])+'">'+x[1]+'</button>';
+  }).join('');
+}
+
+function notes(P){
+  var h='';
+  if(memOnly&&remote.state!=='ok'&&remote.state!=='saving')h+='<div class="note warn"><b>Speichern nicht möglich.</b> Dein Browser blockiert den lokalen Speicher und der Konto-Speicher ist nicht erreichbar. Fortschritt geht beim Schließen verloren.</div>';
+  if(S.sample)h+='<div class="note"><b>Themenliste ist ein Vorschlag.</b> Die Kacheln für Rumpf und Extremitäten habe ich als Gliederung vorgeschlagen, sie stammen nicht aus deiner Kapitelliste. Passe sie unter „Einstellungen“ an.</div>';
+  var rem=P.pend.length||P.anki.rem>0;
+  if(!P.days.length&&rem)h+='<div class="note warn"><b>Keine Lerntage mehr bis zur Prüfung.</b> Alles Offene liegt auf heute.</div>';
+  else if(P.perDay>S.settings.limit+1e-9)h+='<div class="note warn"><b>Rückstand.</b> Du brauchst im Schnitt '+fmt(P.perDay)+' Std. pro Tag, dein Limit ist '+fmt(S.settings.limit)+' Std. Das geht nur mit höherem Limit, weniger Stoff oder weniger Ruhetagen.</div>';
+  return h;
+}
+
+function vHeute(P){
+  var h=notes(P);
+  var tp=vis(P.map[P.today]||[]);
+  var dn=vis(S.topics.filter(function(t){return S.done[t.id]===P.today;}));
+  var at=ankiTile(P.today,P);
+  var rest=S.settings.rest.indexOf(String(parse(P.today).getDay()))>=0;
+  var hasLoad=!!P.load[P.today]&&P.days.length>0&&P.days[0]===P.today;
+  h+='<section class="sec"><div class="sec-h"><h2>Heute, '+fmtDate(P.today)+'</h2>'+(hasLoad?loadPill(P.today,P):'')+daySub(P.today,P)+'</div>';
+  if(!tp.length&&!dn.length&&!at){
+    if(rest)h+='<div class="empty">Ruhetag. Nichts Neues geplant, Verpasstes verteilt sich auf die übrigen Tage.</div>';
+    else if(!P.pend.length&&P.anki.rem===0)h+='<div class="empty">Alles erledigt.</div>';
+    else h+='<div class="empty">Für heute ist in dieser Auswahl nichts offen.</div>';
+  }else h+=grid(at+tiles(tp.concat(dn),P));
+  h+='</section>';
+  var nxt=dayKeys(P).filter(function(d){return d>P.today;})[0];
+  if(nxt){
+    var nl=vis(P.map[nxt]||[]),na=ankiTile(nxt,P);
+    if(nl.length||na)h+='<section class="sec"><div class="sec-h"><h2>Als Nächstes, '+fmtDate(nxt)+'</h2>'+loadPill(nxt,P)+daySub(nxt,P)+'</div>'+grid(na+tiles(nl,P))+'</section>';
+  }
+  return h;
+}
+/* Vergangene Tage: vom Startdatum bis gestern. Pro Tag Anki-Karten eintragen und Kacheln nachträglich abhaken (Erledigt-Datum = dieser Tag). Was dort erfasst wird, fließt in die Neuverteilung der kommenden Tage ein. */
+function pastDays(P){
+  var out=[],d=S.settings.start||'2026-11-01';
+  if(diffDays(d,P.today)>60)d=addDays(P.today,-60);
+  for(;d<P.today;d=addDays(d,1))out.push(d);
+  return out;
+}
+function pastAnki(d,n,P){
+  if(filter==='amboss'||!P.anki.on)return '';
+  var b=function(v){return '<button type="button" class="btn s" data-act="ankiday" data-day="'+d+'" data-n="'+v+'">'+(v<0?'−':'+')+Math.abs(v)+'</button>';};
+  return '<div class="tile anki wide"><div class="arow"><span class="ttl">Anki</span>'+
+    '<label class="num">Karten<input type="number" min="0" inputmode="numeric" data-ankiday="'+d+'" value="'+n+'"></label>'+
+    '<span class="big">'+n+'</span></div>'+
+    '<div class="ctl">'+b(-50)+b(50)+b(100)+'</div>'+
+    '<span class="meta"><span class="tag">Anki</span><span>'+fmt(n/P.anki.pace)+' Std.</span></span></div>';
+}
+function vPast(P){
+  var days=pastDays(P);
+  if(!days.length)return '';
+  var rf=S.settings.rf>0?S.settings.rf:1;
+  var h='<section class="sec"><div class="sec-h"><h2>Vergangene Tage</h2><span class="sub">'+days.length+(days.length===1?' Tag':' Tage')+' zum Nachtragen</span>'+
+    '<button type="button" class="chip" data-act="pasttoggle" aria-expanded="'+(ui.pastOpen?'true':'false')+'">'+(ui.pastOpen?'Ausblenden':'Einblenden')+'</button></div>';
+  if(ui.pastOpen){
+    days.forEach(function(d){
+      var n=S.anki.log[d]||0;
+      var dn=vis(S.topics.filter(function(t){return S.done[t.id]===d;}));
+      var all=S.topics.filter(function(t){return S.done[t.id]===d;});
+      var hrs=(P.anki.on?n/P.anki.pace:0)+all.reduce(function(a,t){return a+t.w*rf;},0);
+      var rest=S.settings.rest.indexOf(String(parse(d).getDay()))>=0;
+      var openT=vis(S.topics.filter(function(t){return !S.done[t.id];}));
+      var inner=pastAnki(d,n,P)+tiles(dn,P,d);
+      h+='<div class="sec"><div class="sec-h"><h2>'+fmtDate(d)+(rest?' (Ruhetag)':'')+'</h2><span class="load">erfasst '+fmt(hrs)+' Std.</span></div>';
+      if(inner)h+=grid(inner);
+      if(openT.length){
+        h+='<div class="btns"><button type="button" class="btn" data-act="nachtoggle" data-day="'+d+'" aria-expanded="'+(ui.nach[d]?'true':'false')+'">'+(ui.nach[d]?'Liste schließen':'Kachel nachtragen ('+openT.length+' offen)')+'</button></div>';
+        if(ui.nach[d])h+=grid(tiles(openT,P,d));
+      }
+      h+='</div>';
+    });
+  }
+  return h+'</section>';
+}
+function vPlan(P){
+  var h=notes(P)+vPast(P),any=false;
+  dayKeys(P).forEach(function(d){
+    var l=vis(P.map[d]||[]),a=ankiTile(d,P);
+    if(!l.length&&!a)return;
+    any=true;
+    h+='<section class="sec"><div class="sec-h"><h2>'+fmtDate(d)+(d===P.today?' (heute)':'')+'</h2>'+loadPill(d,P)+daySub(d,P)+'</div>'+grid(a+tiles(l,P))+'</section>';
+  });
+  if(!any)h+='<div class="empty">Nichts offen.</div>';
+  return h;
+}
+function vThemen(P){
+  var h='';
+  ['anki','amboss'].forEach(function(a){
+    if(filter!=='alle'&&filter!==a)return;
+    var l=S.topics.filter(function(t){return t.area===a;});
+    if(a==='anki'&&!l.length&&S.anki.total<=0)return;
+    var body='';
+    if(a==='anki'&&S.anki.total>0){
+      var ds=Math.min(S.anki.total,sumLog());
+      body+='<div class="note"><b>'+ds+'</b> von '+S.anki.total+' Karten erledigt, '+P.anki.rem+' offen vor heute. Aktuelles Tagesziel: '+P.anki.target+' Karten.</div>';
+    }
+    if(l.length)body+=grid(tiles(l,P));
+    else if(a==='amboss')body+='<div class="empty">Keine Themen.</div>';
+    h+='<section class="sec"><div class="sec-h"><h2>'+AREA[a].name+'</h2>'+(l.length?'<span class="sub">'+l.filter(function(t){return S.done[t.id];}).length+' von '+l.length+' erledigt</span>':'')+'</div>'+body+'</section>';
+  });
+  return h;
+}
+function topicsText(){
+  return S.topics.map(function(t){
+    return (t.area==='anki'?'Anki':'Amboss')+' | '+t.title+' | '+Math.round(t.w*60);
+  }).join('\n');
+}
+function vDaten(){
+  var rest=WD.map(function(w){
+    return '<label><input type="checkbox" name="rest" value="'+w[0]+'"'+(S.settings.rest.indexOf(w[0])>=0?' checked':'')+'>'+w[1]+'</label>';
+  }).join('');
+  return '<form id="f" class="panel">'+
+   '<div class="field"><label for="exam">Prüfungsdatum</label><input type="date" id="exam" value="'+esc(S.settings.exam)+'"><span class="hint">Der letzte Lerntag ist der Tag davor.</span></div>'+
+   '<div class="field"><label for="startdate">Startdatum der Planung</label><input type="date" id="startdate" value="'+esc(S.settings.start||'2026-11-01')+'"><span class="hint">Ab diesem Tag kannst du unter „Plan“ nachtragen, was du schon gelernt hast.</span></div>'+
+   '<div class="field"><label for="limit">Maximale Lernzeit pro Tag (Stunden)</label><input type="number" id="limit" min="0.5" step="0.5" value="'+S.settings.limit+'"></div>'+
+   '<div class="field"><label for="ankitotal">Anki: Karten insgesamt</label><input type="number" id="ankitotal" min="0" step="1" value="'+S.anki.total+'"><span class="hint">0 schaltet das Anki-Tagesziel ab.</span></div>'+
+   '<div class="field"><label for="pace">Anki-Tempo (Karten pro Stunde)</label><input type="number" id="pace" min="10" step="5" value="'+(S.settings.pace||100)+'"><span class="hint">Nur eine Schätzung, damit Anki in Stunden zählt. Trag dein echtes Tempo ein, sobald du es kennst.</span></div>'+
+   '<div class="field"><label for="ankihi">Anki: neue Karten pro Tag am Anfang</label><input type="number" id="ankihi" min="1" step="10" value="'+(S.settings.ankiHi||400)+'"></div>'+
+   '<div class="field"><label for="ankilo">Anki: neue Karten pro Tag am Ende</label><input type="number" id="ankilo" min="1" step="10" value="'+(S.settings.ankiLo||200)+'"><span class="hint">Der Plan setzt zuerst Tage mit dem hohen Wert an, dann einen Übergangstag, dann Tage mit dem niedrigen Wert, sodass die Summe genau aufgeht. Liegt der Durchschnitt außerhalb der beiden Werte, verteilt er gleichmäßig. Am Ende fallen mehr Anki-Wiederholungen an, deshalb sinken die neuen Karten.</span></div>'+
+   '<div class="field"><label for="rf">Lernzeit pro Lesezeit (Faktor)</label><input type="number" id="rf" min="0.5" step="0.1" value="'+(S.settings.rf||1)+'"><span class="hint">Die Lesezeit aus viaMedici/Amboss ist nur die Dauer des Durchlesens. Für die mündliche Prüfung kommen Wiederholen und Abfragen dazu. 1,5 ist eine Schätzung, 1 rechnet nur mit der reinen Lesezeit.</span></div>'+
+   '<div class="field"><span class="lab">Ruhetage</span><div class="rest">'+rest+'</div><span class="hint">An einem Ruhetag ist nichts Neues geplant. Was du verpasst, verteilt sich beim nächsten Öffnen auf die übrigen Tage.</span></div>'+
+   '<div class="field"><label for="topics">Themen (viaMedici und Amboss)</label><textarea id="topics" spellcheck="false">'+esc(topicsText())+'</textarea>'+
+   '<span class="hint">Eine Zeile pro Kachel: Bereich | Titel | Lesezeit in Minuten. Bereich ist „Amboss“. Minuten sind optional, Standard 10. Die Reihenfolge ist die Lernreihenfolge. Wenn du einen Titel änderst, zählt die Kachel als neu und ihr Haken geht verloren.</span></div>'+
+   '<div id="msg" class="'+(msg.err?'err':'')+'">'+esc(msg.t)+'</div>'+
+   '<div class="btns"><button type="submit" class="btn primary">Speichern</button></div>'+
+  '</form>'+
+  '<div class="panel" style="margin-top:12px"><div class="field"><label for="backup">Sicherung</label><textarea id="backup" spellcheck="false" placeholder="Hier erscheint die Sicherung. Zum Einspielen hier einfügen."></textarea>'+
+   '<span class="hint">Dein Stand liegt zusätzlich privat in deinem Konto, nur du kannst ihn lesen. Die Sicherung zum Kopieren ist ein zweites Netz, falls der Konto-Speicher einmal nicht erreichbar ist. Kopier sie gelegentlich in Notizen.</span></div>'+
+   '<div class="btns"><button type="button" class="btn" data-act="export">Sicherung erzeugen und kopieren</button><button type="button" class="btn" data-act="import">Aus Feld einspielen</button><button type="button" class="btn danger" data-act="reset">'+(resetArm?'Wirklich alles zurücksetzen?':'Alles zurücksetzen')+'</button></div></div>';
+}
+
+function render(){
+  var P=computePlan();
+  ensureBase(P);
+  renderHead(P);renderNav();
+  var h=view==='heute'?vHeute(P):view==='plan'?vPlan(P):view==='themen'?vThemen(P):vDaten();
+  var y=window.scrollY;
+  document.getElementById('view').innerHTML=h;
+  paintSync();
+  if(view!=='daten')window.scrollTo(0,y);
+}
+
+function parseTopics(text){
+  var out=[],bad=[],seen={};
+  text.split('\n').forEach(function(line,i){
+    line=line.trim();
+    if(!line||line.charAt(0)==='#')return;
+    var p=line.split('|').map(function(x){return x.trim();});
+    if(p.length<2||!p[1]){bad.push(i+1);return;}
+    var a=p[0].toLowerCase().indexOf('anki')===0||p[0].toLowerCase()==='a'?'anki':'amboss';
+    var mins=parseFloat(String(p[2]||'').replace(',','.'));
+    if(!(mins>0))mins=10;
+    var w=Math.min(720,Math.max(1,mins))/60;
+    var title=p[1],id=idOf(a,title),n=2;
+    while(seen[id]){title=p[1]+' ('+n+')';id=idOf(a,title);n++;}
+    seen[id]=1;
+    out.push({id:id,area:a,title:title,w:w});
+  });
+  return {topics:out,bad:bad};
+}
+function saveForm(){
+  var exam=document.getElementById('exam').value;
+  var start=document.getElementById('startdate').value;
+  var limit=parseFloat(document.getElementById('limit').value);
+  var total=parseInt(document.getElementById('ankitotal').value,10);
+  var pace=parseFloat(document.getElementById('pace').value);
+  var rf=parseFloat(document.getElementById('rf').value);
+  var hi=parseInt(document.getElementById('ankihi').value,10);
+  var lo=parseInt(document.getElementById('ankilo').value,10);
+  var rest=[].slice.call(document.querySelectorAll('input[name=rest]:checked')).map(function(x){return x.value;});
+  var txt=document.getElementById('topics').value;
+  if(!exam){msg={t:'Bitte ein Prüfungsdatum eintragen.',err:true};render();return;}
+  if(!start||start>=exam){msg={t:'Das Startdatum muss vor dem Prüfungsdatum liegen.',err:true};render();return;}
+  if(!(limit>0)){msg={t:'Die Lernzeit pro Tag muss größer als 0 sein.',err:true};render();return;}
+  if(!(total>=0)){msg={t:'Die Kartenzahl muss 0 oder größer sein.',err:true};render();return;}
+  if(!(pace>0)){msg={t:'Das Anki-Tempo muss größer als 0 sein.',err:true};render();return;}
+  if(!(rf>0)){msg={t:'Der Faktor muss größer als 0 sein.',err:true};render();return;}
+  if(!(lo>0)||!(hi>=lo)){msg={t:'Anki: Der Wert am Anfang muss größer oder gleich dem Wert am Ende sein, beide größer als 0.',err:true};render();return;}
+  var r=parseTopics(txt);
+  if(r.bad.length){msg={t:'Zeile '+r.bad.join(', ')+' ist ungültig. Erwartet: Bereich | Titel.',err:true};render();return;}
+  if(!r.topics.length&&!(total>0)){msg={t:'Mindestens ein Thema oder Anki-Karten sind nötig.',err:true};render();return;}
+  var changedPlan=exam!==S.settings.exam||limit!==S.settings.limit||pace!==S.settings.pace||rf!==S.settings.rf||hi!==S.settings.ankiHi||lo!==S.settings.ankiLo||rest.join()!==S.settings.rest.join();
+  var topicsChanged=txt.trim()!==topicsText().trim();
+  var keep={},nd={},nb={};
+  r.topics.forEach(function(t){keep[t.id]=1;});
+  Object.keys(S.done).forEach(function(k){if(keep[k])nd[k]=S.done[k];});
+  Object.keys(S.base).forEach(function(k){if(keep[k])nb[k]=S.base[k];});
+  S.settings={exam:exam,start:start,limit:limit,rest:rest,pace:pace,rf:rf,ankiHi:hi,ankiLo:lo};
+  S.anki.total=total;
+  S.topics=r.topics;S.done=nd;S.base=changedPlan?{}:nb;
+  if(topicsChanged)S.sample=false;
+  save();
+  msg={t:'Gespeichert.',err:false};
+  render();
+}
+function flash(t,err){var m=document.getElementById('msg');if(m){m.className=err?'err':'';m.textContent=t;}}
+function doExport(){
+  var ta=document.getElementById('backup');
+  S.lastBackup=Date.now();persistLocal();paintSync();
+  ta.value=JSON.stringify(S);
+  try{
+    navigator.clipboard.writeText(ta.value).then(function(){flash('Sicherung kopiert.');},function(){ta.select();flash('Markiert. Bitte manuell kopieren.');});
+  }catch(e){ta.select();flash('Markiert. Bitte manuell kopieren.');}
+}
+function doImport(){
+  var ta=document.getElementById('backup');
+  try{
+    var s=JSON.parse(ta.value);
+    if(!s||!Array.isArray(s.topics)||!s.settings||!s.settings.exam)throw new Error('x');
+    s.done=s.done||{};s.base=s.base||{};s.settings.rest=s.settings.rest||[];s.settings.pace=s.settings.pace||100;s.settings.rf=s.settings.rf||1.5;s.settings.ankiHi=s.settings.ankiHi||400;s.settings.ankiLo=s.settings.ankiLo||200;s.settings.start=s.settings.start||'2026-11-01';if(s.ver!==4)s.base={};s.ver=4;
+    s.anki=s.anki||{total:0,log:{}};s.anki.log=s.anki.log||{};
+    S=s;save();msg={t:'Sicherung eingespielt.',err:false};render();
+  }catch(e){flash('Die Sicherung ist ungültig.',true);}
+}
+function setAnkiDay(day,v){
+  var others=sumLog()-(S.anki.log[day]||0);
+  v=Math.max(0,Math.min(v,Math.max(0,S.anki.total-others)));
+  if(v>0)S.anki.log[day]=v;else delete S.anki.log[day];
+  save();render();
+}
+function setAnki(v){setAnkiDay(ymd(new Date()),v);}
+
+document.addEventListener('click',function(e){
+  var el=e.target.closest('[data-id],[data-tab],[data-filter],[data-act]');
+  if(!el)return;
+  if(el.dataset.id){
+    var id=el.dataset.id,day=el.dataset.day||ymd(new Date());
+    if(S.done[id])delete S.done[id];else S.done[id]=day;
+    save();render();
+  }else if(el.dataset.tab){view=el.dataset.tab;resetArm=false;msg={t:'',err:false};render();}
+  else if(el.dataset.filter){filter=el.dataset.filter;render();}
+  else if(el.dataset.act==='anki'){
+    var P=computePlan(),cur=P.anki.done,n=el.dataset.n;
+    setAnki(n==='all'?Math.max(cur,P.anki.target):cur+parseInt(n,10));
+  }
+  else if(el.dataset.act==='ankiday'){
+    var dd=el.dataset.day;
+    setAnkiDay(dd,(S.anki.log[dd]||0)+parseInt(el.dataset.n,10));
+  }
+  else if(el.dataset.act==='pasttoggle'){ui.pastOpen=!ui.pastOpen;render();}
+  else if(el.dataset.act==='nachtoggle'){ui.nach[el.dataset.day]=!ui.nach[el.dataset.day];render();}
+  else if(el.dataset.act==='export')doExport();
+  else if(el.dataset.act==='import')doImport();
+  else if(el.dataset.act==='reset'){
+    if(!resetArm){resetArm=true;render();}
+    else{S=defaults();save();resetArm=false;msg={t:'Zurückgesetzt.',err:false};render();}
+  }
+});
+document.addEventListener('change',function(e){
+  var t=e.target;
+  if(t&&t.id==='ankiToday'){var v=parseInt(t.value,10);setAnki(v>=0?v:0);}
+  else if(t&&t.dataset&&t.dataset.ankiday){var v2=parseInt(t.value,10);setAnkiDay(t.dataset.ankiday,v2>=0?v2:0);}
+});
+document.addEventListener('submit',function(e){e.preventDefault();saveForm();});
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&view!=='daten'){pullRemote();render();}});
+render();
+initRemote();
+if(STANDALONE){try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}}
+})();
+</script>
+</body>
+</html>
